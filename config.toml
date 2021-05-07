@@ -3,6 +3,11 @@ languageCode = "en-gb"
 title = "charlibot"
 theme = "noteworthy"
 
+summaryLength = 40
+# Enable for syntax highlighting
+pygmentsUseClasses = true
+
+
 [params]
   # Blog description at the top of the homepage. Supports markdown.
   description = "Notes on programming related things I find interesting."
@@ -24,3 +29,8 @@ theme = "noteworthy"
 	identifier = "archives"
 	url = "/archives/"
 	weight = 3
+
+[markup]
+  [markup.highlight]
+    style = "monokai"
+

@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="{{ $custom_style.Permalink }}"/> -->
 
     <!-- Modify the custom.css file inside static > css to use vanilla css -->
-    <!-- <link type="text/css" rel="stylesheet" href="{{ "/" | relURL }}css/custom.css"> -->
+    <link type="text/css" rel="stylesheet" href="{{ "/" | relURL }}css/custom.css">
  
     {{ with .OutputFormats.Get "RSS" }}
     {{ printf `<link rel="%s" type="%s" href="%s" title="%s" />` .Rel .MediaType.Type .Permalink $.Site.Title | safeHTML }}
