@@ -25,7 +25,7 @@ case class Person(
 )
 ```
 
-I find higher-kinded types easiest to understand with an example. They are usually used in the contexts of type classes. A functor is the most recognisable example:
+I find higher-kinded types easiest to understand with an example. They are usually used in the contexts of typeclasses. A functor is the most recognisable example:
 
 ```scala
 trait Functor[F[_]]:
@@ -36,8 +36,8 @@ trait Functor[F[_]]:
 
 ```scala
 given Functor[Option] with 
-    def map[A, B](fa: Option[A])(f: A => B): Option[B] =
-      fa.map(f) 
+  def map[A, B](fa: Option[A])(f: A => B): Option[B] =
+    fa.map(f) 
 ```
 
 Now we can look at the motivation for HKD.
@@ -86,7 +86,7 @@ Our ScalaJS people display page will now be able to update each person's field i
 
 At this point we can see a pattern. The `MaybePerson` and `StreamingPerson` case classes use the same fields and underlying types as the `Person` class but with a different wrapper in each case.
 
-Using higher-kinded types, we can make reduce this boilerplate substantially:
+Using higher-kinded types, we can reduce this boilerplate substantially:
 
 ```scala
 case class PersonF[F[_]](
@@ -108,7 +108,7 @@ Anytime we add a new field to PersonF, we need not touch the other types. Our wo
 
 Focusing on the `addPerson` and `updatePerson` functions from before, it might be best to validate the values passed to these functions before committing the changes to the database. Furthermore, if those API requests originate from some user-facing UI, getting back an error message alongside each field would be helpful.
 
-Ordinarily, we would then write a function `validatePerson` which then might call `validateName`, `validateAge`, `validatePostcode` and `validateNickname`. We quickly run into the same problem as before where new fields means more validations.
+Ordinarily, we would then write a function `validatePerson` which then might call `validateName`, `validateAge`, `validatePostcode` and `validateNickname`. We quickly run into the same problem as before where new fields means more validations that might fall out of sync with the underlying data class.
 
 Let's define two new type aliases that can help us out:
 
@@ -120,16 +120,64 @@ type ValidatedPerson = PersonF[Validation]
 What we are saying here is each field of `ValidatedPerson` will be a function that returns either the value passed into it or an error message. Let's take a look at an example with some silly validations:
 
 ```scala
-val personValidations = ValidatedPerson(
-    name => Either.cond(name.startsWith("C"), name, "Name does not being with 'C'"),
+val personValidations = PersonF[Validation](
+    name => Either.cond(name.startsWith("C"), name, "Name does not begin with 'C'"),
     age => Either.cond(age > 0, age, "Age must be greater than 0"),
     postcode => Either.cond(postcode.matches(postcodeRegex), postcode, "Postcode doesn't look right"),
     nickname => Right(nickname)
 )
 ```
 
-Now the question is, how do we apply these validations to an instance of `Person` or `MaybePerson`?
+How do we apply these validations to an instance of `Person` or `MaybePerson`? The operative word being "apply" which we will explore more later. We previously introduced `Functor` without much ceremony. This is a typeclass that injects a function into a data type. We also provided an instance of `Functor` for `Option`. Let's rework that a little to make use of Scala 3's extension methods and add a `Functor` instance for `Identity`:
 
+```scala
+trait Functor[F[_]]:
+  extension [A](fa: F[A]) 
+    def map[B](f: A => B): F[B]
+
+given Functor[Identity] with
+  extension [A](fa: Identity[A]) 
+    def map[B](f: A => B): Identity[B] =
+      f(fa) 
+
+given Functor[Option] with
+  extension [A](fa: Option[A])
+    def map[B](f: A => B): Option[B] =
+      fa.map(f) 
+```
+
+Now we can write a function that relies on the the Functor capability of `Option` and `Identity` to give us a validated person:
+
+```scala
+type ValidationF[F[_]] = [A] =>> F[Either[String, A]]
+def validatePersonF[F[_]: Functor](personF: PersonF[F]): PersonF[ValidationF[F]] = 
+  PersonF(
+    personF.name.map(personValidations.name),
+    personF.age.map(personValidations.age),
+    personF.postcode.map(personValidations.postcode),
+    personF.nickname.map(personValidations.nickname)
+  )
+```
+
+And if we wanted to return whether the validation completed as a whole, failing with the validated person if at least one of the validations failed or returning the person otherwise:
+
+```scala
+def validatePersonFComplete[F[_]: Traverse](personF: PersonF[F]): Either[PersonF[ValidationF[F]], PersonF[F]] = 
+  val v = validatePersonF(personF)
+  val p = for 
+    name <- v.name.sequence
+    age <- v.age.sequence
+    postcode <- v.postcode.sequence
+    nickname <- v.nickname.sequence
+  yield PersonF(name, age, postcode, nickname)
+  p.fold(_ => Left(v), Right(_))
+```
+
+There's a bit to unpack there before moving on. If you're already familiar with `Traverse` and what those `.sequence` calls are doing, feel free to skip ahead to the next section otherwise let's dive in.
+
+
+
+## Do it all over again
 
 ## Testing
 
