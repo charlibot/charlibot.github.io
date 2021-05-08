@@ -82,7 +82,7 @@ case class StreamingPerson(
 )
 ```
 
-Our ScalaJS people display page will now be able to update each person's field in real-time by subscribing to each of these streams.
+Our ScalaJS page that display a list of people will now be able to update each person's field in real-time by subscribing to each of these streams.
 
 At this point we can see a pattern. The `MaybePerson` and `StreamingPerson` case classes use the same fields and underlying types as the `Person` class but with a different wrapper in each case.
 
@@ -102,13 +102,13 @@ type MaybePerson = PersonF[Option]
 type StreamingPerson = PersonF[Stream]
 ```
 
-Anytime we add a new field to PersonF, we need not touch the other types. Our work will focus on implementing the other update call for that field or streaming the other field or whatever it may be.
+Anytime we add a new field to PersonF, we need not touch the other types. Our work will focus on implementing the update call for that field or streaming the other field or whatever it may be.
 
 ## Validation
 
 Focusing on the `addPerson` and `updatePerson` functions from before, it might be best to validate the values passed to these functions before committing the changes to the database. Furthermore, if those API requests originate from some user-facing UI, getting back an error message alongside each field would be helpful.
 
-Ordinarily, we would then write a function `validatePerson` which then might call `validateName`, `validateAge`, `validatePostcode` and `validateNickname`. We quickly run into the same problem as before where new fields means more validations that might fall out of sync with the underlying data class.
+Ordinarily, we would write a function `validatePerson` which then might call `validateName`, `validateAge`, `validatePostcode` and `validateNickname`. We quickly run into the same problem as before where new fields means more validations that might fall out of sync with the underlying data class.
 
 Let's define two new type aliases that can help us out:
 
@@ -146,7 +146,7 @@ given Functor[Option] with
       fa.map(f) 
 ```
 
-Now we can write a function that relies on the the Functor capability of `Option` and `Identity` to give us a validated person:
+Now we can write a function that relies on the the Functor capability that `Option` and `Identity` has to give us a validated person:
 
 ```scala
 type ValidationF[F[_]] = [A] =>> F[Either[String, A]]
@@ -159,7 +159,7 @@ def validatePersonF[F[_]: Functor](personF: PersonF[F]): PersonF[ValidationF[F]]
   )
 ```
 
-And if we wanted to return whether the validation completed as a whole, failing with the validated person if at least one of the validations failed or returning the person otherwise:
+And if we wanted to return whether the validation completed as a whole where we fail with the validated person if at least one of the validations did not pass or returning the person otherwise:
 
 ```scala
 def validatePersonFComplete[F[_]: Traverse](personF: PersonF[F]): Either[PersonF[ValidationF[F]], PersonF[F]] = 
@@ -173,7 +173,7 @@ def validatePersonFComplete[F[_]: Traverse](personF: PersonF[F]): Either[PersonF
   p.fold(_ => Left(v), Right(_))
 ```
 
-There's a bit to unpack there before moving on. If you're already familiar with `Traverse` and what those `.sequence` calls are doing, feel free to skip ahead to the next section otherwise let's dive in.
+There's a bit to unpack here before moving on. If you're already familiar with `Traverse` and what those `.sequence` calls are doing, feel free to skip ahead to the next section otherwise let's dive in.
 
 
 
