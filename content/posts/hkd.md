@@ -173,9 +173,65 @@ def validatePersonFComplete[F[_]: Traverse](personF: PersonF[F]): Either[PersonF
   p.fold(_ => Left(v), Right(_))
 ```
 
-There's a bit to unpack here before moving on. If you're already familiar with `Traverse` and what those `.sequence` calls are doing, feel free to skip ahead to the next section otherwise let's dive in.
+There's a bit to unpack here before moving on. If you're already familiar with `Traverse` and what those `.sequence` calls are doing, feel free to skip ahead to the next section, otherwise, let's dive in.
 
+Our `v.age` from the snippet above is of type `F[Either[String, Int]]`, however we want to get the `Either` on the outside. That's where `.sequence` comes in, this essentially turns the types inside out, moving the `F` inside so we end up with `Either[String, F[Int]]`. The for comprehension helps us then construct our person on the right side if everything went well.
 
+To be able to call `.sequence`, the `F` needs to be traversable, hence the typeclass `Traverse`:
+
+```scala
+trait Traverse[F[_]] extends Functor[F]:
+  extension [A](fa: F[A])
+    def traverse[G[_]: Applicative, B](f: A => G[B]): G[F[B]]
+    def map[B](f: A => B): F[B] = fa.traverse[Identity, B](f)
+  extension [G[_]: Applicative, A](fga: F[G[A]])
+    def sequence: G[F[A]] = fga.traverse(ga => ga)
+```
+
+In fact, `sequence` is written in terms of `traverse` which is a more generic function so let's focus on that. It is often used to perform some effect, for example taking a name and looking up an ID in a database, `String => IO[Int]`, on a `List` of names, returning the list within a single effect `IO[List[Int]]` instead of `List[IO[Int]]`. However, this ability to switch the place of the effect can be helpful in other places like ours.
+
+Looking at the signature a little closer, we see `G` is required to have an instance of the `Applicative` typeclass:
+
+```scala
+trait Applicative[F[_]] extends Functor[F]:
+  def pure[A](x: A): F[A]
+  extension [A](fa: F[A])
+    def ap[B](ff: F[A => B]): F[B]
+    def map[B](f: A => B): F[B] =
+      fa.ap(pure(f))
+    def map2[B, C](fb: F[B])(f: (A, B) => C): F[C] =
+      fb.ap(fa.map(a => (b: B) => f(a, b)))
+```
+
+`Applicative` gives us the ability to lift an object into the `F` type with `pure`. It also gives us the ability to take two `F` objects and apply a function on both of their internal values together, producing a new `F` with `map2`. Note, `map2` is written in terms of `ap` which I find to be less intuitive than `map2` so will forego explanation. 
+
+Mapping these typeclasses back to our validation function, we need our `F[_]` to have `Traverse` instances and `Either[String, A]` needs to be applicative. On the latter:
+
+```scala
+given [A]: Applicative[[B] =>> Either[A, B]] with
+  def pure[B](x: B): Either[A, B] = Right(x)
+  extension [B](fa: Either[A, B])
+    def ap[C](ff: Either[A, B => C]): Either[A, C] =
+      ff match 
+        case Right(f) => fa.map(f)
+        case Left(l) => Left(l)
+```
+
+And our `Traverse` instances for `Identity` and `Option`:
+
+```scala
+given Traverse[Identity] with
+  extension [A](fa: Identity[A])
+    def traverse[G[_]: Applicative, B](f: A => G[B]): G[Identity[B]] =
+      f(fa)
+
+given Traverse[Option] with
+  extension [A](fa: Option[A])
+    def traverse[G[_]: Applicative, B](f: A => G[B]): G[Option[B]] =
+      fa match 
+        case Some(a) => summon[Applicative[G]].map(f(a))(Some(_))
+        case None => summon[Applicative[G]].pure(None)
+```
 
 ## Do it all over again
 
