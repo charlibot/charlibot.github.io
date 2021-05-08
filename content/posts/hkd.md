@@ -235,6 +235,20 @@ given Traverse[Option] with
 
 ## Do it all over again
 
+To recap, we have redefined our class representing a person to use a higher-kinded type `F[_]`. This gave us the ability to reuse our data class to represent one with optional fields, streamable fields and let us define a set of validations for each field. We then used created a helpful function to return our validated person or the set of errors if any were found.
+
+If we had to start do the process again with another case class, we would find ourselves writing the same boilerplate to validate each field of the class and then sequencing and combining all the fields. Let's see if we can remove some of that boilerplate.
+
+We previously discussed the `Applicative` type class which gives us the `map2` method:
+
+```scala
+def map2[B, C](fa: F[A])(fb: F[B])(f: (A, B) => C): F[C]
+```
+
+If we squint, we could see that our person object could map into `F[A]` and validation object into `F[B]` then the function `f` would somehow map over each field and run the validation across the corresponding value from the person object, ultimately returning a new validated person object.
+
+Using the `Applicative` typeclass directly is not possible since the type signature does not quite match. 
+
 ## Testing
 
 `type ListPerson = PersonF[List]`
