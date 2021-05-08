@@ -252,18 +252,40 @@ Using the `Applicative` typeclass directly is not possible since the type signat
 ```scala
 trait FunctorK[U[_[_]]]:
   extension [F[_]](u: U[F])
-    def mapK[G[_]](f: [T] => (t: F[T]) => G[T]): U[G]
+    def mapK[G[_]](f: [T] => F[T] => G[T]): U[G]
 
 trait ApplyK[U[_[_]]] extends FunctorK[U]:
   extension [F[_]](u: U[F])
-    def map2K[G[_], H[_]](v: U[G])(f: [T] => (t: F[T], s: G[T]) => H[T]): U[H]
-    def mapK[G[_]](f: [T] => (t: F[T]) => G[T]): U[G] = 
+    def map2K[G[_], H[_]](v: U[G])(f: [T] => (F[T], G[T]) => H[T]): U[H]
+    def mapK[G[_]](f: [T] => F[T] => G[T]): U[G] = 
       u.map2K(u)([T] => (t: F[T], _: F[T]) => f(t))
 ```
 
-The `mapK` function takes a higher-kinded data class, `U[_[_]]`, with a higher-kinded type, `F[_]`, and a polymorphic function that can convert our `F[T]`s into `G[T]`s for any type `T`. An example function could be `mapK([T] => (t: Identity[T]) => Some(t))` which would wrap all the fields of a data class in `Some`. The `map2K` function is similar but takes an additional data class with a different higher-kinded type and thus the polymorphic function takes an additional argument. If we can derive `ApplyK` for our case classes we will be on the way to our goal of cutting down the boilerplate.
+The `mapK` function takes a higher-kinded data class, `U[_[_]]`, with a higher-kinded type, `F[_]`, and a polymorphic function that can convert our `F[T]`s into `G[T]`s for any type `T`. An example function could be `[T] => (t: Identity[T]) => Some(t)` which would wrap all the fields of a data class in a `Some`. The `map2K` function is similar but takes an additional data class with a different higher-kinded type and thus the polymorphic function takes an additional argument. If we can derive `ApplyK` for our case classes we will be on the way to our goal of cutting down the boilerplate.
 
+We can leverage the fact case classes are products in Scala and the mirrors:
 
+```scala
+import scala.compiletime.summonFrom
+import scala.deriving.Mirror
+
+inline def deriveApplyKCaseClass[U[_[_]] <: Product]: ApplyK[U] = 
+  new ApplyK[U] {
+    extension [F[_]](u: U[F])
+      def map2K[G[_], H[_]](v: U[G])(f: [T] => (F[T], G[T]) => H[T]): U[H] = summonFrom {
+        case p: Mirror.ProductOf[U[F]] =>
+          p.fromProduct(new Product {
+            def canEqual(that: Any): Boolean = true
+            def productArity: Int = u.productArity
+            def productElement(n: Int): Any =
+              f(u.productElement(n).asInstanceOf[F[Any]], v.productElement(n).asInstanceOf[G[Any]])
+          }).asInstanceOf[U[H]]
+        case _ => sys.error("cannot handle this")
+      }
+  }
+
+given ApplyK[PersonF] = deriveApplyKCaseClass[PersonF]
+```
 
 ## Testing
 
