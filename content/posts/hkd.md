@@ -247,7 +247,23 @@ def map2[B, C](fa: F[A])(fb: F[B])(f: (A, B) => C): F[C]
 
 If we squint, we could see that our person object could map into `F[A]` and validation object into `F[B]` then the function `f` would somehow map over each field and run the validation across the corresponding value from the person object, ultimately returning a new validated person object.
 
-Using the `Applicative` typeclass directly is not possible since the type signature does not quite match. 
+Using the `Applicative` typeclass directly is not possible since the type signature of `PersonF[F[_]]` does not quite match the required `F[A]`. We need to go one level higher which is usually denoted with a `K` suffix on the typeclasses:
+
+```scala
+trait FunctorK[U[_[_]]]:
+  extension [F[_]](u: U[F])
+    def mapK[G[_]](f: [T] => (t: F[T]) => G[T]): U[G]
+
+trait ApplyK[U[_[_]]] extends FunctorK[U]:
+  extension [F[_]](u: U[F])
+    def map2K[G[_], H[_]](v: U[G])(f: [T] => (t: F[T], s: G[T]) => H[T]): U[H]
+    def mapK[G[_]](f: [T] => (t: F[T]) => G[T]): U[G] = 
+      u.map2K(u)([T] => (t: F[T], _: F[T]) => f(t))
+```
+
+The `mapK` function takes a higher-kinded data class, `U[_[_]]`, with a higher-kinded type, `F[_]`, and a polymorphic function that can convert our `F[T]`s into `G[T]`s for any type `T`. An example function could be `mapK([T] => (t: Identity[T]) => Some(t))` which would wrap all the fields of a data class in `Some`. The `map2K` function is similar but takes an additional data class with a different higher-kinded type and thus the polymorphic function takes an additional argument. If we can derive `ApplyK` for our case classes we will be on the way to our goal of cutting down the boilerplate.
+
+
 
 ## Testing
 
