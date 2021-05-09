@@ -25,7 +25,7 @@ case class Person(
 )
 ```
 
-I find higher-kinded types easiest to understand with an example. They are usually used in the contexts of typeclasses. A functor is the most recognisable example:
+I find higher-kinded types easiest to understand with an example. They are usually used in the contexts of type classes. A functor is the most recognisable example:
 
 ```scala
 trait Functor[F[_]]:
@@ -128,7 +128,7 @@ val personValidations = PersonF[Validation](
 )
 ```
 
-How do we apply these validations to an instance of `Person` or `MaybePerson`? The operative word being "apply" which we will explore more later. We previously introduced `Functor` without much ceremony. This is a typeclass that injects a function into a data type. We also provided an instance of `Functor` for `Option`. Let's rework that a little to make use of Scala 3's extension methods and add a `Functor` instance for `Identity`:
+How do we apply these validations to an instance of `Person` or `MaybePerson`? The operative word being "apply" which we will explore more later. We previously introduced `Functor` without much ceremony. This is a type class that injects a function into a data type. We also provided an instance of `Functor` for `Option`. Let's rework that a little to make use of Scala 3's extension methods and add a `Functor` instance for `Identity`:
 
 ```scala
 trait Functor[F[_]]:
@@ -177,7 +177,7 @@ There's a bit to unpack here before moving on. If you're already familiar with `
 
 Our `v.age` from the snippet above is of type `F[Either[String, Int]]`, however we want to get the `Either` on the outside. That's where `.sequence` comes in, this essentially turns the types inside out, moving the `F` inside so we end up with `Either[String, F[Int]]`. The for comprehension helps us then construct our person on the right side if everything went well.
 
-To be able to call `.sequence`, the `F` needs to be traversable, hence the typeclass `Traverse`:
+To be able to call `.sequence`, the `F` needs to be traversable, hence the type class `Traverse`:
 
 ```scala
 trait Traverse[F[_]] extends Functor[F]:
@@ -190,7 +190,7 @@ trait Traverse[F[_]] extends Functor[F]:
 
 In fact, `sequence` is written in terms of `traverse` which is a more generic function so let's focus on that. It is often used to perform some effect, for example taking a name and looking up an ID in a database, `String => IO[Int]`, on a `List` of names, returning the list within a single effect `IO[List[Int]]` instead of `List[IO[Int]]`. However, this ability to switch the place of the effect can be helpful in other places like ours.
 
-Looking at the signature a little closer, we see `G` is required to have an instance of the `Applicative` typeclass:
+Looking at the signature a little closer, we see `G` is required to have an instance of the `Applicative` type class:
 
 ```scala
 trait Applicative[F[_]] extends Functor[F]:
@@ -205,7 +205,7 @@ trait Applicative[F[_]] extends Functor[F]:
 
 `Applicative` gives us the ability to lift an object into the `F` type with `pure`. It also gives us the ability to take two `F` objects and apply a function on both of their internal values together, producing a new `F` with `map2`. Note, `map2` is written in terms of `ap` which I find to be less intuitive than `map2` so will forego explanation. 
 
-Mapping these typeclasses back to our validation function, we need our `F[_]` to have `Traverse` instances and `Either[String, A]` needs to be applicative. On the latter:
+Mapping these type classes back to our validation function, we need our `F[_]` to have `Traverse` instances and `Either[String, A]` needs to be applicative. On the latter:
 
 ```scala
 given [A]: Applicative[[B] =>> Either[A, B]] with
@@ -247,7 +247,7 @@ def map2[B, C](fa: F[A])(fb: F[B])(f: (A, B) => C): F[C]
 
 If we squint, we could see that our person object could map into `F[A]` and validation object into `F[B]` then the function `f` would somehow map over each field and run the validation across the corresponding value from the person object, ultimately returning a new validated person object.
 
-Using the `Applicative` typeclass directly is not possible since the type signature of `PersonF[F[_]]` does not quite match the required `F[A]`. We need to go one level higher which is usually denoted with a `K` suffix on the typeclasses:
+Using the `Applicative` type class directly is not possible since the type signature of `PersonF[F[_]]` does not quite match the required `F[A]`. We need to go one level higher which is usually denoted with a `K` suffix on the type classes:
 
 ```scala
 trait FunctorK[U[_[_]]]:
@@ -261,15 +261,17 @@ trait ApplyK[U[_[_]]] extends FunctorK[U]:
       u.map2K(u)([T] => (t: F[T], _: F[T]) => f(t))
 ```
 
+Note: we do not need the full power of `Applicative` with `pure`. Instead, we need only `map2` which comes from `Apply` which sits between `Functor` and `Applicative` in the type class hierarchy.
+
 The `mapK` function takes a higher-kinded data class, `U[_[_]]`, with a higher-kinded type, `F[_]`, and a polymorphic function that can convert our `F[T]`s into `G[T]`s for any type `T`. An example function could be `[T] => (t: Identity[T]) => Some(t)` which would wrap all the fields of a data class in a `Some`. The `map2K` function is similar but takes an additional data class with a different higher-kinded type and thus the polymorphic function takes an additional argument. If we can derive `ApplyK` for our case classes we will be on the way to our goal of cutting down the boilerplate.
 
-We can leverage the fact case classes are products in Scala and the mirrors:
+We can leverage the fact case classes are products in Scala to derive `ApplyK`:
 
 ```scala
 import scala.compiletime.summonFrom
 import scala.deriving.Mirror
 
-inline def deriveApplyKCaseClass[U[_[_]] <: Product]: ApplyK[U] = 
+inline def deriveApplyKForCaseClass[U[_[_]] <: Product]: ApplyK[U] = 
   new ApplyK[U] {
     extension [F[_]](u: U[F])
       def map2K[G[_], H[_]](v: U[G])(f: [T] => (F[T], G[T]) => H[T]): U[H] = summonFrom {
@@ -283,10 +285,37 @@ inline def deriveApplyKCaseClass[U[_[_]] <: Product]: ApplyK[U] =
         case _ => sys.error("cannot handle this")
       }
   }
-
-given ApplyK[PersonF] = deriveApplyKCaseClass[PersonF]
 ```
+
+To briefly summarise `map2K`'s implementation: 
+  - we start with `summonFrom` which does an implicit search for the types in the pattern match, in this case a `Mirror.ProductOf[U[F]]`. Use of this function means we must make the function `inline`
+  - `Mirror.ProductOf[U[F]]` provides type level information on our product `U`. In this case, we use it to build our case class after applying the function. There is a lot more to mirrors so if interested check out the docs
+  - `fromProduct` takes a product that can be used to build an instance of `U`. We create a new product with the same arity as the original and where the nth element is the application of the function `f` on the nth element of `u` and `v` case classes. We have to do some ugly casts but I'm not sure if that's avoidable
+
+Now we can rewrite our validation function from before:
+
+```scala
+given ApplyK[PersonF] = deriveApplyKForCaseClass[PersonF]
+
+def validatePersonF[F[_]: Functor](personF: PersonF[F]): PersonF[ValidationF[F]] = 
+  personF.map2K(personValidations)(
+    [T] => (value: F[T], validation: Validation[T]) => value.map(validation)
+  )
+```
+
+Any new fields added to the `PersonF` would not require any updates to this function now. We could even make this more generic, giving us the ability to validate any case class:
+
+```scala
+def validateU[U[_[_]]: ApplyK, F[_]: Functor](u: U[F], validations: U[Validation]): U[ValidationF[F]] =
+  u.map2K(validations)(
+    [T] => (value: F[T], validation: Validation[T]) => value.map(validation)
+  )
+```
+
+The last step in validating our case class is to return either our original case class if all validations succeeded or return the one with the error messages otherwise. We are aiming to return `Either[U[Validation[F]], U[F]]`.
 
 ## Testing
 
 `type ListPerson = PersonF[List]`
+
+TODO: Rename `ValidationF` to `ValidatedF`?
