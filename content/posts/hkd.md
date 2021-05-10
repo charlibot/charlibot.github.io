@@ -314,6 +314,8 @@ def validateU[U[_[_]]: ApplyK, F[_]: Functor](u: U[F], validations: U[Validation
 
 The last step in validating our case class is to return either our original case class if all validations succeeded or return the one with the error messages otherwise. We are aiming to return `Either[U[Validation[F]], U[F]]`.
 
+The key observation here is the for comprehension...it looks like traverse.
+
 ## Testing
 
 `type ListPerson = PersonF[List]`
