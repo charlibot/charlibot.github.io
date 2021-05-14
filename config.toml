@@ -10,7 +10,7 @@ pygmentsUseClasses = true
 
 [params]
   # Blog description at the top of the homepage. Supports markdown.
-  description = "Notes on programming related things I find interesting."
+  description = "Notes on programming."
   github = "https://github.com/charlibot"
 [[menu.main]]
 	identifier = "about"
