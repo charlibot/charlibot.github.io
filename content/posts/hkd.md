@@ -339,8 +339,8 @@ inline def deriveTraverseKForCaseClass[U[_[_]] <: Product]: TraverseK[U] =
       def traverseK[V[_]: Applicative, G[_]](f: [T] => F[T] => V[G[T]]): V[U[G]] = summonFrom {
         case p: Mirror.ProductOf[U[F]] =>
           val appliedF = u.productIterator.toList.map(t => f(t.asInstanceOf[F[Any]]))
-          val vTuple: V[Tuple] = appliedF.foldLeft(summon[Applicative[V]].pure(EmptyTuple)) { (vgs, x) =>
-            x.map2(vgs)((a, tuple) => (a *: tuple))
+          val vTuple: V[Tuple] = appliedF.foldRight(summon[Applicative[V]].pure(EmptyTuple)) { (vgs, x) =>
+            x.map2(vgs)((tuple, a) => (a *: tuple) )
           }
 
           vTuple.map { tuple =>
@@ -401,8 +401,8 @@ object ApplyTraverseK:
       def traverseK[V[_]: Applicative, G[_]](f: [T] => F[T] => V[G[T]]): V[U[G]] = summonFrom {
         case p: Mirror.ProductOf[U[F]] =>
           val appliedF = u.productIterator.toList.map(t => f(t.asInstanceOf[F[Any]]))
-          val vTuple: V[Tuple] = appliedF.foldLeft(summon[Applicative[V]].pure(EmptyTuple)) { (vgs, x) =>
-            x.map2(vgs)((a, tuple) => (a *: tuple) )
+          val vTuple: V[Tuple] = appliedF.foldRight(summon[Applicative[V]].pure(EmptyTuple)) { (vgs, x) =>
+            x.map2(vgs)((tuple, a) => (a *: tuple) )
           }
           vTuple.map { tuple =>
             p.fromProduct(new Product {
