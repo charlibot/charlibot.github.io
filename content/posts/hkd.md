@@ -1,7 +1,6 @@
 ---
 title: "Higher-kinded data in Scala 3"
 date: 2021-05-07T14:11:50+02:00
-draft: true
 tags: [
     "fp",
     "scala3",
