@@ -1,4 +1,4 @@
-baseURL = "http://charlibot.github.io/"
+baseURL = "https://charlibot.github.io/"
 languageCode = "en-gb"
 title = "charlibot"
 theme = "noteworthy"
