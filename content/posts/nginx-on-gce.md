@@ -4,6 +4,8 @@ date: 2021-09-15T11:47:27+02:00
 draft: true
 ---
 
+This post captures thought process as much as the technical side. Skip to the end section for the code.
+
 - Have some static content in GCS
 - Served with storage backend + global load balancer (diagram)
 - Has some excellent features. Used in day job and makes total sense to use in 99% of cases
@@ -20,6 +22,7 @@ How to do it?
 - relatively little experience in Nginx
 - eventually found an example that worked for me
 - tried a bunch of variations with docker. Ended up using cloud-init because one less thing to concern myself with
+  - cloud init is nice. I think can use it in other cloud providers (read some stuff around digital ocean for example when googling it)
 - added ssl with certbot
   - examples on internet were a little outdated and I was too optimistic. terraform apply and hope
   - wasn't sure if should allow certbot to edit the nginx conf directly. no in the end, only adds a couple of lines and i'd rather know what's going on so used certonly 
