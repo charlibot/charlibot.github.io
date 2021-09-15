@@ -4,6 +4,10 @@ Built with Hugo.
 
 Locally `hugo server -D` and visit http://localhost:1313/.
 
+## New page
+
+`hugo new posts/my-new-post.md`
+
 ## Themes
 
 So much choice. Some decent ones I've found so far:
