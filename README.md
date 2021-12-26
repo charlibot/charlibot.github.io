@@ -4,6 +4,11 @@ Built with Hugo.
 
 Locally `hugo server -D` and visit http://localhost:1313/.
 
+## Writing
+
+Start a new page with `hugo new posts/my-first-post.md`.
+When it's ready for prime-time, change `draft` to `false` in the metadata section at the top of the file.
+
 ## Themes
 
 So much choice. Some decent ones I've found so far:
