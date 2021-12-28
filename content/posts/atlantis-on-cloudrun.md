@@ -26,7 +26,7 @@ Atlantis is essentially a HTTP server with a UI to view locks and an endpoint to
 - [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine)
 - [Cloud Run](https://cloud.google.com/run)
 
-**Compute Engine** can be configured to run Docker containers but integration with the data disk necessitates an ugly startup script and some firewall rules. **GKE** on the other hand would be straightforward to setup Atlantis with, especially given the provided [Helm chart](https://github.com/runatlantis/helm-charts), however, we'd need a GKE cluster which would ideally be provisioned from Atlantis. Let's see how far we get with **Cloud Run**, a managed serverless platform to run containers.
+**Compute Engine** can be configured to run Docker containers but integration with the Atlantis data disk necessitates an ugly startup script and some firewall rules. **GKE** on the other hand would be straightforward to setup Atlantis with, especially given the provided [Helm chart](https://github.com/runatlantis/helm-charts), however, we'd need a GKE cluster which would ideally be provisioned from Atlantis. Let's see how far we get with **Cloud Run**, a managed serverless platform to run containers.
 
 ## Cloud Run
 
@@ -68,21 +68,71 @@ At this point, we have a couple of options:
 1. Create a backend and associated [load balancer](https://cloud.google.com/load-balancing) with [Cloud Armor](https://cloud.google.com/armor) rules to limit the IP addresses that can access the service to Github and your workplace.
 1. Create two backends, one for `/events` which can be open or apply the Cloud Armor rules from above and another backend matching everything else to be protected by [Identity Aware Proxy](https://cloud.google.com/iap).
 
+In both cases we can use a custom domain and managed SSL certificate. Let's focus on the second approach:
+
 TODO: some terraform code
+
+Finally, we should restrict the Cloud Run service's ingress to "Internal and Cloud Load Balancing". Then, the default domain cannot be used to bypass the protections added above.
 
 ### State
 
-- gcs keeps state
-- not really needed
+Atlantis keeps some state about which pull requests are open and associated plans and locks. It also clones the Terraform repos in order to run the `plan` and `apply` commands.
+
+Cloud Run uses an in-memory file system for disk storage. Atlantis' disk and memory usage is usually quite low so 8GB should be sufficient.
+
+We can set Cloud Run to have a minimum number of instances of 1 and for the most part, this would mean we keep our state across invocations. However, occasionally, Cloud Run will restart the container causing all the built up state to be lost.
+
+To get around this, we can backup the state to GCS with some regularity. Before starting the Atlantis server and after acquiring the lock described in [Runtime](#runtime), we would pull the state from GCS.
+
+Let's expand on the startup script from before:
+
+```shell
+source /gcslock.sh
+lock $ATLANTIS_BUCKET
+
+function cleanup() {
+  gsutil rsync -d -r $ATLANTIS_DATA_DIR gs://$ATLANTIS_BUCKET/atlantis/ || true
+  unlock $ATLANTIS_BUCKET
+}
+
+trap 'cleanup' SIGTERM
+
+# Pull from $ATLANTIS_BUCKET/atlantis to $ATLANTIS_DATA_DIR
+mkdir -p $ATLANTIS_DATA_DIR
+gsutil rsync -d -r gs://$ATLANTIS_BUCKET/atlantis/ $ATLANTIS_DATA_DIR
+chown -R atlantis:atlantis $ATLANTIS_DATA_DIR
+
+# start server...
+
+# Sync the files back to GCS every minute
+crontab -l | { cat; echo "* * * * * gsutil rsync -d -r $ATLANTIS_DATA_DIR gs://$ATLANTIS_BUCKET/atlantis/"; } | crontab -
+crond
+```
+
+The addition of the `gsutil rsync` command in `cleanup` pushes any final state changes to GCS before finishing.
 
 ## Summary
 
-- cloud run viable
-- architecture diagram
-- find sample terraform code charlibot/atlantis-on-cloudrun. Would need to change it for your own purposes.
+We've seen how we can setup Atlantis in Cloud Run, taking care to configure the service to use always allocated CPU and introduce a locking mechanism to ensure only one instance is ever running. We reasoned about why we'd need a load balancer and Cloud Armor and/or IAP to protect the endpoints. Finally, we look into how we can keep state. The diagram below summarises this architecture:
 
-## Reflection
+TODO: diagram
 
-1. GCS fuse. Initial spark but didn't work out. BoltDB causing issues. 
-1. Just use compute engine - yeah, maybe
-1. Comparison with fargate?
+Please find the full Terraform code in [charlibot/atlantis-on-cloudrun](https://github.com/charlibot/atlantis-on-cloudrun).
+
+### Reflection
+
+#### GCS fuse
+
+I recently stumbled onto the [Using Cloud Storage FUSE with Cloud Run tutorial](https://cloud.google.com/run/docs/tutorials/network-filesystems-fuse) and this is what initially sparked this investigation.
+
+Unfortunately, I wasn't able to get Atlantis working with this. I believe the issues is related to Atlantis' use of BoltDB and how that integrates with the file system. 
+
+Periodically syncing the state files to GCS was the compromise. It's conceivable that some state is missing or even corrupted in some way in GCS with this approach (e.g. if a container is SIGKILLed halfway through an `rysnc`). If anything goes wrong, some manual intervention may be required to wipe the `/atlantis` directory in GCS.
+
+##### Compute Engine
+
+With the locking and periodic GCS syncing workarounds, I am not entirely convinced running Atlantis on Cloud Run is a better idea than running it on Compute Engine. Fortunately, the access control section would still apply since we can swap the serverless backends for instance group ones.
+
+I mentioned the need for an "ugly startup script" when deploying the Atlantis container image and data disk. This is because the Atlantis account has to `chown` the mounted directory which I can't find a good way to do. It might be worth investing some time into improving this to do a fairer comparison with Cloud Run.
+
+## Thanks for reading!
