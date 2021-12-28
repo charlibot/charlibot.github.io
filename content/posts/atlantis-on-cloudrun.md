@@ -131,7 +131,7 @@ Unfortunately, I wasn't able to get Atlantis working with FUSE. I believe the re
 
 Periodically syncing the files to GCS was the compromise. It's conceivable that some state is missing or even corrupted in some way in GCS with this approach (e.g. if a container is SIGKILLed halfway through an `rysnc`). If anything goes wrong, some manual intervention may be required to wipe the `/atlantis` directory in GCS.
 
-##### Compute Engine
+#### Compute Engine
 
 With the locking and periodic GCS syncing workarounds, I am not entirely convinced running Atlantis on Cloud Run is a better solution compared to running it on Compute Engine. If we ask for 1 VM in Compute Engine, we will only ever have up to 1 VM running so no locking is necessary. Furthermore, simply attaching a data disk is sufficient for storing state across restarts. Fortunately, not all work is lost since the access control section would still apply by simply swapping the serverless backends for instance group ones that point to the Atlantis VM.
 
