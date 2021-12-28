@@ -6,7 +6,7 @@ draft: true
 
 [Atlantis](https://www.runatlantis.io/) is a service developers use to apply [Terraform](https://www.terraform.io/) plans from pull requests. Atlantis needs to run *somewhere* before it can start applying Terraform changes from your PRs and this post describes how you can get Atlantis running on Google's [Cloud Run](https://cloud.google.com/run).
 
-### Terraform and Atlantis
+## Terraform and Atlantis
 
 Engineering teams with a DevOps culture will often provision their own infrastructure from the likes of Google (GCP), Amazon (AWS) and Microsoft (Azure). This can include a managed Kubernetes cluster, a topic in Pub/Sub and an Elastic MapReduce cluster amongst many other provided services. Terraform is often used to define these as code and also provision them.
 
@@ -28,11 +28,11 @@ Atlantis is essentially a HTTP server with a UI to view locks and an endpoint to
 
 **Compute Engine** can be configured to run Docker containers but integration with the data disk necessitates an ugly startup script and some firewall rules. **GKE** on the other hand would be straightforward to setup Atlantis with, especially given the provided [Helm chart](https://github.com/runatlantis/helm-charts), however, we'd need a GKE cluster which would ideally be provisioned from Atlantis. Let's see how far we get with **Cloud Run**, a managed serverless platform to run containers.
 
-### Cloud Run
+## Cloud Run
 
 Cloud Run can be used to reliably run a single instance of a container with a HTTP server. This makes it an potential fit for Atlantis. However, we have to be wary of some of Cloud Run's runtime features as well as leveraging other GCP products to fill out the full solution.
 
-#### Runtime
+### Runtime
 
 The Atlantis service does a lot of its processing in the background, after having already responded to a pull request event. Enabling [always allocated CPU](https://cloud.google.com/run/docs/configuring/cpu-allocation) means we can reliably do this processing.
 
@@ -55,25 +55,34 @@ The `gcslock.sh` script can be found at [mco-gh/gcslock](https://github.com/mco-
 
 Cloud Run will send a `SIGTERM` signal to the container and wait 10 seconds before terminating a container. We catch this signal and call `unlock` which deletes the lock object, allowing the next container to get the lock and start the server. 
 
-#### Access control
+### Access control
 
+The first time a Cloud Run service is deployed, it provides a URL that can be used to call the service. By default, services must be called with an ID token in the request's `Authorization` header.
 
+At least with Github, there are no options to send pull request events with an ID token. A [secret token](https://docs.github.com/en/developers/webhooks-and-events/webhooks/securing-your-webhooks) is the only option. Therefore, we must enable public access to our Cloud Run Atlantis service.
 
-#### State
+Now, we can ensure the `/events` endpoint is secure with the secret token. However, we have nothing to protect us against nefarious actors discarding plans and unlocking PRs from the UI.
 
-1. What is Atlantis.
-  1. Chicken and egg problem. Compute engine, tiny GKE. Want smallest footprint possible but not do too much hacky stuff (previous iteration generated ssl certs and mounted them in a compute engine instance, not fun) because will be started from my machine (as a developer).
-  1. HTTP server. UI for viewing locks/prs and unlocking. Events endpoint for github to send PR related activity to. 
-1. What is Cloud Run. Now, with always on cpu, makes it good candidate.
-1. Architecture:
-  - Cloud Run runs service
-  - HTTPS load balancer
-  - Cloud Armor+github secret protects /events endpoint
-  - IAP protects UI
-  - GCS to lock
-  - GCS to keep state
-1. Failure considerations - worst case, everything is corrupted and need to wipe gcs bucket. Lose locks but not a big deal.
-1. What the terraform looks like
+At this point, we have a couple of options:
+
+1. Create a backend and associated [load balancer](https://cloud.google.com/load-balancing) with [Cloud Armor](https://cloud.google.com/armor) rules to limit the IP addresses that can access the service to Github and your workplace.
+1. Create two backends, one for `/events` which can be open or apply the Cloud Armor rules from above and another backend matching everything else to be protected by [Identity Aware Proxy](https://cloud.google.com/iap).
+
+TODO: some terraform code
+
+### State
+
+- gcs keeps state
+- not really needed
+
+## Summary
+
+- cloud run viable
+- architecture diagram
+- find sample terraform code charlibot/atlantis-on-cloudrun. Would need to change it for your own purposes.
+
+## Reflection
+
 1. GCS fuse. Initial spark but didn't work out. BoltDB causing issues. 
 1. Just use compute engine - yeah, maybe
 1. Comparison with fargate?
