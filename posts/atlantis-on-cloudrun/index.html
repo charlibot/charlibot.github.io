@@ -1,0 +1,295 @@
+<!doctype html><html lang=en-gb>
+<head>
+<meta charset=utf-8>
+<meta http-equiv=x-ua-compatible content="IE=edge,chrome=1">
+<meta name=viewport content="width=device-width,initial-scale=1">
+<meta name=format-detection content="telephone=no">
+<title>Atlantis on Cloud Run | charlibot</title>
+<link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png>
+<link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png>
+<link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png>
+<link rel=manifest href=/manifest.json>
+<link rel=mask-icon href=/safari-pinned-tab.svg color=#ff3db4>
+<meta name=theme-color content="#ffffff">
+<link rel=stylesheet href=https://charlibot.github.io/css/main.min.9e7c561cacc19edcd1d2bb23129ea244f2c0c03ac6b6d18ab9755f17b95fa3f0.css>
+<link type=text/css rel=stylesheet href=/css/custom.css>
+</head>
+<body>
+<nav>
+<header>
+<div class=site-title>
+<a href=/>charlibot</a>
+</div>
+</header>
+<div class=nav-menu>
+<a class="color-link nav-link" href=/about/>About</a>
+<a class="color-link nav-link" href=/tags/>Tags</a>
+<a class="color-link nav-link" href=/archives/>Archives</a>
+<a class="color-link nav-link" href=https://charlibot.github.io/index.xml target=_blank rel=noopener type=application/rss+xml>RSS</a>
+</div>
+<footer class=footer>
+<div class=social-icons>
+<a class=social-icon href=https://github.com/charlibot target=_blank rel=noopener title=GitHub><svg width="28" height="28" viewBox="0 0 28 28" fill="#ababab" xmlns="https://www.w3.org/2000/svg" xmlns:xlink="https://www.w3.org/1999/xlink"><path d="M13.9988029 1.32087331C6.82105037 1.32087331 1 7.14112562 1 14.3212723c0 5.7436386 3.72454649 10.6157955 8.89038951 12.3348169C10.5408085 26.7757983 10.7778323 26.374374 10.7778323 26.0296121 10.7778323 25.7215609 10.7666595 24.9035493 10.760275 23.8189856 7.14426471 24.6042767 6.38131925 22.0760223 6.38131925 22.0760223c-.59136253-1.5019491-1.44369072-1.9017772-1.44369072-1.9017772C3.75729765 19.3682044 5.02701126 19.3841656 5.02701126 19.3841656 6.33183953 19.4759425 7.01817121 20.7241085 7.01817121 20.7241085c1.15958133 1.9863716 3.04300319 1.4125664 3.78360289 1.0797753.1181129-.8395592.4540962-1.4125663.8251942-1.7373768C8.74038491 19.7385043 5.70536235 18.6228163 5.70536235 13.6413251c0-1.4189508.50676816-2.5801283 1.33834679-3.4883207C6.90963504 9.82420367 6.46351945 8.50181809 7.17139875 6.71256734c0 0 1.09094816-.34955032 3.57451115 1.33276037C11.78259 7.75642995 12.8950858 7.61277914 14.000399 7.60719272 15.1049142 7.61277914 16.2166119 7.75642995 17.2548881 8.04532771c2.4819669-1.68231069 3.571319-1.33276037 3.571319-1.33276037C21.5356825 8.50181809 21.0895669 9.82420367 20.9562909 10.1530044 21.7894656 11.0611968 22.2922435 12.2223743 22.2922435 13.6413251c0 4.9942601-3.039811 6.0931889-5.935173 6.4148071.4660671.401424200000001.8818564 1.194696.8818564 2.4077473C17.2389269 24.2012564 17.2229657 25.603448 17.2229657 26.0296121 17.2229657 26.3775663 17.4575954 26.7821827 18.116793 26.6552912 23.2786458 24.9322794 27 20.0633148 27 14.3212723 27 7.14112562 21.1789496 1.32087331 13.9988029 1.32087331"/></svg>
+</a>
+</div>
+<p><a href=https://github.com/kimcc/hugo-theme-noteworthy target=_blank rel=noopener>Noteworthy theme</a></p>
+<p><a href=https://gohugo.io target=_blank rel=noopener>Built with Hugo</a></p>
+<script src=https://charlibot.github.io/js/main.min.c1aee25a817e9beb1f9c4afd9d62311227a7f5e46720e404dc1dda97281f47f2.js integrity="sha256-wa7iWoF+m+sfnEr9nWIxEien9eRnIOQE3B3alygfR/I=" crossorigin=anonymous></script>
+</footer>
+</nav>
+<div id=content class=content-container>
+<h1 class=post-title>Atlantis on Cloud Run</h1>
+<time>December 26, 2021</time>
+<div>
+<p>
+<p><a href=https://www.runatlantis.io/>Atlantis</a> is a service developers use to apply <a href=https://www.terraform.io/>Terraform</a> plans from pull requests. Atlantis needs to run <em>somewhere</em> before it can start applying Terraform changes from your PRs and this post describes how to get Atlantis running on Google&rsquo;s <a href=https://cloud.google.com/run>Cloud Run</a>.</p>
+<p>Whilst this post is centred on getting Atlantis to run on Cloud Run, it touches on a few of Google&rsquo;s other products and their integrations with Cloud Run so may be of interest even if Atlantis is not.</p>
+<h2 id=terraform-and-atlantis>Terraform and Atlantis</h2>
+<p>Engineering teams with a DevOps culture will often provision their own infrastructure from the likes of Google (GCP), Amazon (AWS) and Microsoft (Azure). This can include a managed Kubernetes cluster, a topic in Pub/Sub or an Elastic MapReduce cluster amongst many other provided services. Terraform is often used to define these as code and also provision them.</p>
+<p>Atlantis can be used to ensure the Terraform changes are always ran from one place (instead of each developer&rsquo;s machine) and integrates with a team&rsquo;s existing git workflow. This looks like:</p>
+<ol>
+<li>Create a PR in the Terraform repo with your requested infrastructure changes.</li>
+<li>Atlantis locks the repo, plans the changes and adds this as a comment to the PR.</li>
+<li>You review the plan.</li>
+<li>Optionally, you can require approval from a team member.</li>
+<li>You ask Atlantis to apply the changes with a comment.</li>
+</ol>
+<p>The catch is we want Atlantis to deploy infrastructure but we need Atlantis running <em>somewhere</em> before we can start using it (🐔 and 🥚).</p>
+<p>Atlantis is essentially a HTTP server with a UI to view locks and an endpoint to receive pull request related events. It stores state on which PRs have locks and the plans themselves. Additionally, there is a <a href=https://hub.docker.com/r/runatlantis/atlantis/>Docker image</a> available. Assuming we&rsquo;ve chosen GCP as our public cloud provider, we have a few options to run such a service:</p>
+<ul>
+<li><a href=https://cloud.google.com/compute>Compute Engine</a></li>
+<li><a href=https://cloud.google.com/kubernetes-engine>Google Kubernetes Engine (GKE)</a></li>
+<li><a href=https://cloud.google.com/run>Cloud Run</a></li>
+</ul>
+<p><strong>Compute Engine</strong> can be configured to run Docker containers but integration with the Atlantis data disk necessitates an ugly startup script and some firewall rules. <strong>GKE</strong> on the other hand would be straightforward to setup Atlantis with, especially given the provided <a href=https://github.com/runatlantis/helm-charts>Helm chart</a>. However, we&rsquo;d need a GKE cluster which would ideally be provisioned from Atlantis. Let&rsquo;s see how far we get with <strong>Cloud Run</strong>, a managed serverless platform to run containers.</p>
+<h2 id=cloud-run>Cloud Run</h2>
+<p>Cloud Run can be used to reliably run a single instance of a container with a HTTP server. This makes it a potential fit for Atlantis. We have to be wary though of some of Cloud Run&rsquo;s runtime characteristics as well as leveraging other GCP products to fill out the full solution.</p>
+<h3 id=runtime>Runtime</h3>
+<p>The Atlantis service does a lot of its processing in the background, after having already responded to a pull request event. Enabling <a href=https://cloud.google.com/run/docs/configuring/cpu-allocation>always allocated CPU</a> means we can do this processing.</p>
+<p>Secondly, we only ever want 1 single instance to be receiving events and modifying state. We can set the <a href=https://cloud.google.com/run/docs/configuring/max-instances>maximum number of instances</a> to 1 but Cloud Run will only bring an instance down if another is up and able to receive traffic. In practice then, we may see more than 1 instance running in certain periods. To work around this, we can lock an instance at startup and release it when an instance is shutting down:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-shell data-lang=shell><span class=nb>source</span> /gcslock.sh
+lock <span class=nv>$ATLANTIS_BUCKET</span>
+
+<span class=k>function</span> cleanup<span class=o>()</span> <span class=o>{</span>
+  unlock <span class=nv>$ATLANTIS_BUCKET</span>
+<span class=o>}</span>
+
+<span class=nb>trap</span> <span class=s1>&#39;cleanup&#39;</span> SIGTERM
+
+<span class=c1># rest of Atlantis server startup</span>
+</code></pre></div><p>The <code>gcslock.sh</code> script can be found at <a href=https://github.com/mco-gh/gcslock/blob/master/gcslock.sh>mco-gh/gcslock</a>. The <code>lock</code> function tries to create an object with the header <code>x-goog-if-generation-match:0</code>. We can rely on Google Cloud Storage&rsquo;s (GCS) <a href=https://cloud.google.com/storage/docs/consistency>strong consistency guarantees</a> to ensure when we try to create this object in the <code>ATLANTIS_BUCKET</code>, it will only succeed if no such object exists. If it fails to create the object, and thus get the lock, it will continually retry with an increasing backoff between retries.</p>
+<p>When shutting down, Cloud Run will send a <code>SIGTERM</code> signal to the container and wait 10 seconds before terminating a container. We catch this signal and call <code>unlock</code> which deletes the lock object, allowing the next container to get the lock and start the server.</p>
+<h3 id=access-control>Access control</h3>
+<p>When a Cloud Run service is deployed, GCP provides a default URL that can be used to call the service. Also, by default, services must be called by authorized users and service accounts with their ID token in the request&rsquo;s <code>Authorization</code> header.</p>
+<p>At least with Github, there are no options to send pull request events with an ID token. A <a href=https://docs.github.com/en/developers/webhooks-and-events/webhooks/securing-your-webhooks>secret token</a> is the only option. Therefore, we must enable <a href=https://cloud.google.com/run/docs/authenticating/public>public access</a> to our Cloud Run Atlantis service.</p>
+<p>Now, we can ensure the <code>/events</code> endpoint is secure with a secret token. However, we have nothing to protect us against nefarious actors discarding plans and unlocking PRs from the UI.</p>
+<p>At this point, we have a couple of options:</p>
+<ol>
+<li>Create a backend and associated <a href=https://cloud.google.com/load-balancing>load balancer</a> with <a href=https://cloud.google.com/armor>Cloud Armor</a> rules to limit the IP addresses that can access the service to Github and the workplace.</li>
+<li>Create two backends, one for <code>/events</code> which can be open (or apply the Cloud Armor rules from above) and another backend matching everything else to be protected by <a href=https://cloud.google.com/iap>Identity Aware Proxy</a>.</li>
+</ol>
+<p>In both cases we can use a custom domain and managed SSL certificate. Let&rsquo;s focus on the second approach and see what the Terraform code for the load balancer module looks like:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-terraform data-lang=terraform><span class=kr>module</span> <span class=s2>&#34;atlantis-lb-https&#34;</span> <span class=p>{</span><span class=c1>
+</span><span class=c1>  # We use the serverless negs module from https://github.com/terraform-google-modules/terraform-google-lb-http/tree/master/modules/serverless_negs
+</span><span class=c1></span>  <span class=na>source</span>  = <span class=s2>&#34;GoogleCloudPlatform/lb-http/google//modules/serverless_negs&#34;</span>
+  <span class=na>version</span> = <span class=s2>&#34;~&gt; 5.1&#34;</span>
+  <span class=na>name</span>    = <span class=s2>&#34;atlantis&#34;</span>
+  <span class=na>project</span> = <span class=nb>var</span><span class=p>.</span><span class=nx>project_id</span><span class=c1>
+</span><span class=c1>
+</span><span class=c1>  # Enable SSL support with a managed certificate and HTTPS redirect
+</span><span class=c1></span>  <span class=na>ssl</span>                             = <span class=kc>true</span>
+  <span class=na>managed_ssl_certificate_domains</span> = <span class=p>[</span><span class=nb>var</span><span class=p>.</span><span class=nx>domain</span><span class=p>]</span>
+  <span class=na>https_redirect</span>                  = <span class=kc>true</span><span class=c1>
+</span><span class=c1>
+</span><span class=c1>  # This map is where we define which backend gets which requests based on the path. We will see the resource definition later.
+</span><span class=c1></span>  <span class=na>url_map</span>        = <span class=nx>google_compute_url_map</span><span class=p>.</span><span class=nx>atlantis_url_map</span><span class=p>.</span><span class=nx>self_link</span>
+  <span class=na>create_url_map</span> = <span class=kc>false</span>
+
+  <span class=na>backends</span> = <span class=p>{</span><span class=c1>
+</span><span class=c1>    # Default backend for the UI with IAP enabled
+</span><span class=c1></span>    <span class=na>default</span> = <span class=p>{</span>
+      <span class=na>description</span> = <span class=nx>null</span>
+      <span class=na>groups</span> = <span class=p>[</span>
+        <span class=p>{</span>
+          <span class=na>group</span> = <span class=nx>google_compute_region_network_endpoint_group</span><span class=p>.</span><span class=nx>serverless_neg</span><span class=p>.</span><span class=nx>id</span>
+        <span class=p>}</span>
+      <span class=p>]</span>
+      <span class=na>enable_cdn</span>              = <span class=kc>false</span>
+      <span class=na>security_policy</span>         = <span class=nx>null</span>
+      <span class=na>custom_request_headers</span>  = <span class=nx>null</span>
+      <span class=na>custom_response_headers</span> = <span class=nx>null</span>
+
+      <span class=na>iap_config</span> = <span class=p>{</span>
+        <span class=na>enable</span>               = <span class=kc>true</span>
+        <span class=na>oauth2_client_id</span>     = <span class=nb>var</span><span class=p>.</span><span class=nx>oauth2_client_id</span>
+        <span class=na>oauth2_client_secret</span> = <span class=nb>var</span><span class=p>.</span><span class=nx>oauth2_client_secret</span>
+      <span class=p>}</span>
+      <span class=na>log_config</span> = <span class=p>{</span>
+        <span class=na>enable</span>      = <span class=kc>false</span>
+        <span class=na>sample_rate</span> = <span class=nx>null</span>
+      <span class=p>}</span>
+    <span class=p>}</span><span class=c1>
+</span><span class=c1>
+</span><span class=c1>    # Backend for /events with IAP disabled but with the security policy set to github_only_policy
+</span><span class=c1></span>    <span class=na>events</span> = <span class=p>{</span>
+      <span class=na>description</span> = <span class=s2>&#34;Backend for Atlantis&#39; /events endpoint&#34;</span>
+      <span class=na>groups</span> = <span class=p>[</span>
+        <span class=p>{</span>
+          <span class=na>group</span> = <span class=nx>google_compute_region_network_endpoint_group</span><span class=p>.</span><span class=nx>serverless_neg</span><span class=p>.</span><span class=nx>id</span>
+        <span class=p>}</span>
+      <span class=p>]</span>
+      <span class=na>enable_cdn</span>              = <span class=kc>false</span>
+      <span class=na>security_policy</span>         = <span class=nx>google_compute_security_policy</span><span class=p>.</span><span class=nx>github_only_policy</span><span class=p>.</span><span class=nx>name</span>
+      <span class=na>custom_request_headers</span>  = <span class=nx>null</span>
+      <span class=na>custom_response_headers</span> = <span class=nx>null</span>
+
+      <span class=na>iap_config</span> = <span class=p>{</span>
+        <span class=na>enable</span>               = <span class=kc>false</span>
+        <span class=na>oauth2_client_id</span>     = <span class=s2>&#34;&#34;</span>
+        <span class=na>oauth2_client_secret</span> = <span class=s2>&#34;&#34;</span>
+      <span class=p>}</span>
+      <span class=na>log_config</span> = <span class=p>{</span>
+        <span class=na>enable</span>      = <span class=kc>false</span>
+        <span class=na>sample_rate</span> = <span class=nx>null</span>
+      <span class=p>}</span>
+    <span class=p>}</span>
+  <span class=p>}</span>
+<span class=p>}</span>
+</code></pre></div><p>The Terraform code above refers to some resources that are defined below. These may need some tweaking for your own setup but the general idea is there.</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-terraform data-lang=terraform><span class=kr>resource</span> <span class=s2>&#34;google_compute_region_network_endpoint_group&#34;</span> <span class=s2>&#34;atlantis_serverless_neg&#34;</span> <span class=p>{</span>
+<span class=kr>  provider</span>              <span class=o>=</span> <span class=nx>google</span><span class=o>-</span><span class=nx>beta</span>
+  <span class=na>name</span>                  = <span class=s2>&#34;atlantis-serverless-neg&#34;</span>
+  <span class=na>network_endpoint_type</span> = <span class=s2>&#34;SERVERLESS&#34;</span>
+  <span class=na>region</span>                = <span class=nb>var</span><span class=p>.</span><span class=nx>region</span>
+  <span class=nx>cloud_run</span> <span class=p>{</span><span class=c1>
+</span><span class=c1>    # The name of the Cloud Run service. This can also be defined in Terraform and referred to here
+</span><span class=c1></span>    <span class=na>service</span> = <span class=s2>&#34;atlantis&#34;</span>
+  <span class=p>}</span>
+<span class=p>}</span>
+<span class=kr>
+</span><span class=kr>resource</span> <span class=s2>&#34;google_compute_security_policy&#34;</span> <span class=s2>&#34;github_only_policy&#34;</span> <span class=p>{</span>
+  <span class=na>name</span> = <span class=s2>&#34;github-only-policy&#34;</span>
+
+  <span class=nx>rule</span> <span class=p>{</span>
+    <span class=na>action</span>   = <span class=s2>&#34;allow&#34;</span>
+    <span class=na>priority</span> = <span class=s2>&#34;1000&#34;</span>
+    <span class=nx>match</span> <span class=p>{</span>
+      <span class=na>versioned_expr</span> = <span class=s2>&#34;SRC_IPS_V1&#34;</span>
+      <span class=nx>config</span> <span class=p>{</span>
+        <span class=na>src_ip_ranges</span> = <span class=p>[</span>
+          <span class=s2>&#34;192.30.252.0/22&#34;</span><span class=p>,</span>
+          <span class=s2>&#34;185.199.108.0/22&#34;</span><span class=p>,</span>
+          <span class=s2>&#34;140.82.112.0/20&#34;</span><span class=p>,</span>
+          <span class=s2>&#34;143.55.64.0/20&#34;</span><span class=p>,</span>
+          <span class=s2>&#34;2a0a:a440::/29&#34;</span><span class=p>,</span>
+          <span class=s2>&#34;2606:50c0::/32&#34;</span><span class=p>,</span>
+        <span class=p>]</span>
+      <span class=p>}</span>
+    <span class=p>}</span>
+    <span class=na>description</span> = <span class=s2>&#34;Allow access from Github&#39;s webhook IPs found at https://api.github.com/meta&#34;</span>
+  <span class=p>}</span>
+
+  <span class=nx>rule</span> <span class=p>{</span>
+    <span class=na>action</span>   = <span class=s2>&#34;deny(403)&#34;</span>
+    <span class=na>priority</span> = <span class=s2>&#34;2147483647&#34;</span>
+    <span class=nx>match</span> <span class=p>{</span>
+      <span class=na>versioned_expr</span> = <span class=s2>&#34;SRC_IPS_V1&#34;</span>
+      <span class=nx>config</span> <span class=p>{</span>
+        <span class=na>src_ip_ranges</span> = <span class=p>[</span><span class=s2>&#34;*&#34;</span><span class=p>]</span>
+      <span class=p>}</span>
+    <span class=p>}</span>
+    <span class=na>description</span> = <span class=s2>&#34;Deny access to all IPs&#34;</span>
+  <span class=p>}</span>
+<span class=p>}</span>
+<span class=kr>
+</span><span class=kr>resource</span> <span class=s2>&#34;google_compute_url_map&#34;</span> <span class=s2>&#34;atlantis_url_map&#34;</span> <span class=p>{</span>
+  <span class=na>name</span>            = <span class=s2>&#34;atlantis&#34;</span>
+  <span class=na>default_service</span> = <span class=nb>module</span><span class=p>.</span><span class=nx>atlantis</span><span class=o>-</span><span class=nx>lb</span><span class=o>-</span><span class=nx>https</span><span class=p>.</span><span class=nx>backend_services</span><span class=p>[</span><span class=s2>&#34;default&#34;</span><span class=p>].</span><span class=nx>self_link</span>
+
+  <span class=nx>host_rule</span> <span class=p>{</span>
+    <span class=na>hosts</span>        = <span class=p>[</span><span class=nb>var</span><span class=p>.</span><span class=nx>domain</span><span class=p>]</span>
+    <span class=na>path_matcher</span> = <span class=s2>&#34;allpaths&#34;</span>
+  <span class=p>}</span>
+
+  <span class=nx>path_matcher</span> <span class=p>{</span>
+    <span class=na>name</span>            = <span class=s2>&#34;allpaths&#34;</span>
+    <span class=na>default_service</span> = <span class=nb>module</span><span class=p>.</span><span class=nx>atlantis</span><span class=o>-</span><span class=nx>lb</span><span class=o>-</span><span class=nx>https</span><span class=p>.</span><span class=nx>backend_services</span><span class=p>[</span><span class=s2>&#34;default&#34;</span><span class=p>].</span><span class=nx>self_link</span>
+
+    <span class=nx>path_rule</span> <span class=p>{</span>
+      <span class=na>paths</span> = <span class=p>[</span>
+        <span class=s2>&#34;/events&#34;</span>
+      <span class=p>]</span>
+      <span class=na>service</span> = <span class=nb>module</span><span class=p>.</span><span class=nx>atlantis</span><span class=o>-</span><span class=nx>lb</span><span class=o>-</span><span class=nx>https</span><span class=p>.</span><span class=nx>backend_services</span><span class=p>[</span><span class=s2>&#34;events&#34;</span><span class=p>].</span><span class=nx>self_link</span>
+    <span class=p>}</span>
+  <span class=p>}</span>
+<span class=p>}</span>
+</code></pre></div><p>Finally, we should restrict the Cloud Run service&rsquo;s <a href=https://cloud.google.com/run/docs/securing/ingress>ingress</a> to &ldquo;Internal and Cloud Load Balancing&rdquo;. Then, the default domain cannot be used to bypass the protections added above.</p>
+<h3 id=state>State</h3>
+<p>Atlantis keeps some state about which pull requests are open and the associated plans and locks. It also clones the Terraform repos in order to run the <code>plan</code> and <code>apply</code> commands.</p>
+<p>Cloud Run uses an in-memory file system for disk storage. Atlantis' disk and memory usage is usually quite low so 8GB, Cloud Run&rsquo;s maximum, should be sufficient.</p>
+<p>We can set Cloud Run to have a minimum number of instances of 1 and for the most part, this would mean we keep our state across invocations. However, occasionally, Cloud Run will restart the container causing all the built up state to be lost.</p>
+<p>To get around this, we can backup the state to GCS with some regularity. Before starting the Atlantis server and after acquiring the lock described in <a href=#runtime>Runtime</a>, we would pull the state from GCS.</p>
+<p>Let&rsquo;s expand on the startup script from before:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-shell data-lang=shell><span class=nb>source</span> /gcslock.sh
+lock <span class=nv>$ATLANTIS_BUCKET</span>
+
+<span class=k>function</span> cleanup<span class=o>()</span> <span class=o>{</span>
+  gsutil rsync -d -r <span class=nv>$ATLANTIS_DATA_DIR</span> gs://<span class=nv>$ATLANTIS_BUCKET</span>/atlantis/ <span class=o>||</span> <span class=nb>true</span>
+  unlock <span class=nv>$ATLANTIS_BUCKET</span>
+<span class=o>}</span>
+
+<span class=nb>trap</span> <span class=s1>&#39;cleanup&#39;</span> SIGTERM
+
+<span class=c1># Pull from $ATLANTIS_BUCKET/atlantis to $ATLANTIS_DATA_DIR</span>
+mkdir -p <span class=nv>$ATLANTIS_DATA_DIR</span>
+gsutil rsync -d -r gs://<span class=nv>$ATLANTIS_BUCKET</span>/atlantis/ <span class=nv>$ATLANTIS_DATA_DIR</span>
+chown -R atlantis:atlantis <span class=nv>$ATLANTIS_DATA_DIR</span>
+
+<span class=c1># start server...</span>
+<span class=nb>export</span> <span class=nv>ATLANTIS_PORT</span><span class=o>=</span><span class=nv>$PORT</span>
+gosu atlantis atlantis server <span class=p>&amp;</span>
+
+<span class=c1># Sync the files back to GCS every minute</span>
+crontab -l <span class=p>|</span> <span class=o>{</span> cat<span class=p>;</span> <span class=nb>echo</span> <span class=s2>&#34;* * * * * gsutil rsync -d -r </span><span class=nv>$ATLANTIS_DATA_DIR</span><span class=s2> gs://</span><span class=nv>$ATLANTIS_BUCKET</span><span class=s2>/atlantis/&#34;</span><span class=p>;</span> <span class=o>}</span> <span class=p>|</span> crontab -
+crond
+
+<span class=c1># Exit immediately when one of the background processes terminate.</span>
+<span class=nb>wait</span> -n
+</code></pre></div><p>The addition of the <code>gsutil rsync</code> command in <code>cleanup</code> pushes any final state changes to GCS before finishing.</p>
+<h2 id=summary>Summary</h2>
+<p>We&rsquo;ve seen how we can setup Atlantis in Cloud Run, taking care to configure the service to use always allocated CPU and introduce a locking mechanism to ensure only one instance is ever doing any work. We reasoned about why we&rsquo;d need a load balancer and Cloud Armor and/or IAP to protect the endpoints. Finally, we looked into how we can keep state across restarts by periodically backing the state up to GCS. The diagram below summarises this architecture:</p>
+<p><img src=../atlantis-on-cloudrun-gcp-architecture.png alt="Atlantis on Cloud Run GCP architecture"></p>
+<h3 id=reflection>Reflection</h3>
+<h4 id=gcs-fuse>GCS fuse</h4>
+<p>I recently stumbled onto <a href=https://cloud.google.com/run/docs/tutorials/network-filesystems-fuse>Using Cloud Storage FUSE with Cloud Run tutorial</a> and this is what initially sparked this investigation.</p>
+<p>Unfortunately, I wasn&rsquo;t able to get Atlantis working with gcsfuse. I believe the reason why not is related to Atlantis' use of <a href=https://github.com/etcd-io/bbolt>bbolt</a> and how that works with the file system.</p>
+<p>Periodically syncing the files to GCS was the compromise. It&rsquo;s conceivable that some state is missing or even corrupted in some way in GCS with this approach (e.g. if a container is <code>SIGKILL</code>ed halfway through an <code>rysnc</code>). If anything goes wrong, some manual intervention may be required to wipe the <code>/atlantis</code> directory in GCS. This is not a deal breaker though: for developers using Atlantis, they may see their plans and locks disappear so would need to ask Atlantis to run those again.</p>
+<p>In my experience with other services, Cloud Run does not restart always allocated CPU instances very frequently, with many days between restarts, so not having persistent state is a valid position to hold provided your team understands the consequences.</p>
+<h4 id=compute-engine>Compute Engine</h4>
+<p>With the locking and periodic GCS syncing workarounds, I am not entirely convinced running Atlantis on Cloud Run is a better solution than running it on Compute Engine. If we ask for 1 VM in Compute Engine, we will only ever have up to 1 VM running so no locking is necessary. Furthermore, attaching a data disk is sufficient for storing state across restarts. Fortunately, not all our investigations here are lost since the access control section would still apply by swapping the serverless backends for instance group ones that point to the Atlantis VM.</p>
+<p>Earlier, I mentioned the need for an &ldquo;ugly startup script&rdquo; when deploying the Atlantis container image and data disk. This is because the Atlantis account has to <code>chown</code> the mounted directory which I couldn&rsquo;t find a good way to do at the time. Now I&rsquo;ve experimented with this Cloud Run approach, which includes some additions to the existing Atlantis Docker image, I can probably find a nicer way to do that <code>chown</code> and roll with the Compute Engine setup instead of Cloud Run.</p>
+<h2 id=thanks-for-reading>Thanks for reading!</h2>
+</p>
+</div>
+<div class=page-footer>
+<hr class=footer-divider>
+<a class=tag href=/tags/gcp>#gcp</a>
+<a class=tag href=/tags/terraform>#terraform</a>
+<a class=tag href=/tags/cloudrun>#cloudrun</a>
+<a class=tag href=/tags/devops>#devops</a>
+</div>
+</div>
+<footer class=footer-mobile>
+<div class=social-icons>
+<a class=social-icon href=https://github.com/charlibot target=_blank rel=noopener title=GitHub><svg width="28" height="28" viewBox="0 0 28 28" fill="#ababab" xmlns="https://www.w3.org/2000/svg" xmlns:xlink="https://www.w3.org/1999/xlink"><path d="M13.9988029 1.32087331C6.82105037 1.32087331 1 7.14112562 1 14.3212723c0 5.7436386 3.72454649 10.6157955 8.89038951 12.3348169C10.5408085 26.7757983 10.7778323 26.374374 10.7778323 26.0296121 10.7778323 25.7215609 10.7666595 24.9035493 10.760275 23.8189856 7.14426471 24.6042767 6.38131925 22.0760223 6.38131925 22.0760223c-.59136253-1.5019491-1.44369072-1.9017772-1.44369072-1.9017772C3.75729765 19.3682044 5.02701126 19.3841656 5.02701126 19.3841656 6.33183953 19.4759425 7.01817121 20.7241085 7.01817121 20.7241085c1.15958133 1.9863716 3.04300319 1.4125664 3.78360289 1.0797753.1181129-.8395592.4540962-1.4125663.8251942-1.7373768C8.74038491 19.7385043 5.70536235 18.6228163 5.70536235 13.6413251c0-1.4189508.50676816-2.5801283 1.33834679-3.4883207C6.90963504 9.82420367 6.46351945 8.50181809 7.17139875 6.71256734c0 0 1.09094816-.34955032 3.57451115 1.33276037C11.78259 7.75642995 12.8950858 7.61277914 14.000399 7.60719272 15.1049142 7.61277914 16.2166119 7.75642995 17.2548881 8.04532771c2.4819669-1.68231069 3.571319-1.33276037 3.571319-1.33276037C21.5356825 8.50181809 21.0895669 9.82420367 20.9562909 10.1530044 21.7894656 11.0611968 22.2922435 12.2223743 22.2922435 13.6413251c0 4.9942601-3.039811 6.0931889-5.935173 6.4148071.4660671.401424200000001.8818564 1.194696.8818564 2.4077473C17.2389269 24.2012564 17.2229657 25.603448 17.2229657 26.0296121 17.2229657 26.3775663 17.4575954 26.7821827 18.116793 26.6552912 23.2786458 24.9322794 27 20.0633148 27 14.3212723 27 7.14112562 21.1789496 1.32087331 13.9988029 1.32087331"/></svg>
+</a>
+</div>
+<div class=footer-mobile-links>
+<p><a href=https://github.com/kimcc/hugo-theme-noteworthy target=_blank rel=noopener>Noteworthy theme</a></p>
+<span class=divider-bar>|</span>
+<p><a href=https://gohugo.io target=_blank rel=noopener>Built with Hugo</a></p>
+</div>
+<script src=https://charlibot.github.io/js/main.min.c1aee25a817e9beb1f9c4afd9d62311227a7f5e46720e404dc1dda97281f47f2.js integrity="sha256-wa7iWoF+m+sfnEr9nWIxEien9eRnIOQE3B3alygfR/I=" crossorigin=anonymous></script>
+</footer>
+</body>
+</html>
