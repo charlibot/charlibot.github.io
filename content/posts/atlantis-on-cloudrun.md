@@ -59,17 +59,17 @@ trap 'cleanup' SIGTERM
 # rest of Atlantis server startup
 ```
 
-The `gcslock.sh` script can be found at [mco-gh/gcslock](https://github.com/mco-gh/gcslock/blob/master/gcslock.sh). The `lock` function tries to create an object with the header `x-goog-if-generation-match:0`. We can rely on Google Cloud Storage's (GCS) [strong consistency guarantees](https://cloud.google.com/storage/docs/consistency) to ensure when we try to create this object in the `ATLANTIS_BUCKET`, it will only succeed if no such object exists. If it fails to create the object, and thus get the lock, it will continually retry after some increasing backoff.
+The `gcslock.sh` script can be found at [mco-gh/gcslock](https://github.com/mco-gh/gcslock/blob/master/gcslock.sh). The `lock` function tries to create an object with the header `x-goog-if-generation-match:0`. We can rely on Google Cloud Storage's (GCS) [strong consistency guarantees](https://cloud.google.com/storage/docs/consistency) to ensure when we try to create this object in the `ATLANTIS_BUCKET`, it will only succeed if no such object exists. If it fails to create the object, and thus get the lock, it will continually retry with an increasing backoff between retries.
 
-Cloud Run will send a `SIGTERM` signal to the container and wait 10 seconds before terminating a container. We catch this signal and call `unlock` which deletes the lock object, allowing the next container to get the lock and start the server. 
+When shutting down, Cloud Run will send a `SIGTERM` signal to the container and wait 10 seconds before terminating a container. We catch this signal and call `unlock` which deletes the lock object, allowing the next container to get the lock and start the server. 
 
 ### Access control
 
-When a Cloud Run service is deployed, GCP provides a default URL that can be used to call the service. By default, services must be called with an ID token in the request's `Authorization` header.
+When a Cloud Run service is deployed, GCP provides a default URL that can be used to call the service. Also, by default, services must be called by authorized users and service accounts with their ID token in the request's `Authorization` header.
 
 At least with Github, there are no options to send pull request events with an ID token. A [secret token](https://docs.github.com/en/developers/webhooks-and-events/webhooks/securing-your-webhooks) is the only option. Therefore, we must enable [public access](https://cloud.google.com/run/docs/authenticating/public) to our Cloud Run Atlantis service.
 
-Now, we can ensure the `/events` endpoint is secure with the secret token. However, we have nothing to protect us against nefarious actors discarding plans and unlocking PRs from the UI.
+Now, we can ensure the `/events` endpoint is secure with a secret token. However, we have nothing to protect us against nefarious actors discarding plans and unlocking PRs from the UI.
 
 At this point, we have a couple of options:
 
@@ -91,6 +91,7 @@ module "atlantis-lb-https" {
   managed_ssl_certificate_domains = [var.domain]
   https_redirect                  = true
 
+  # This map is where we define which backend gets which requests based on the path. We will see the resource definition later.
   url_map        = google_compute_url_map.atlantis_url_map.self_link
   create_url_map = false
 
@@ -119,7 +120,7 @@ module "atlantis-lb-https" {
       }
     }
 
-    # Backend for /events with IAP disabled but with github_only_policy
+    # Backend for /events with IAP disabled but with the security policy set to github_only_policy
     events = {
       description = "Backend for Atlantis' /events endpoint"
       groups = [
@@ -274,14 +275,16 @@ We've seen how we can setup Atlantis in Cloud Run, taking care to configure the 
 
 I recently stumbled onto [Using Cloud Storage FUSE with Cloud Run tutorial](https://cloud.google.com/run/docs/tutorials/network-filesystems-fuse) and this is what initially sparked this investigation.
 
-Unfortunately, I wasn't able to get Atlantis working with gcsfuse. I believe the reason why not is related to Atlantis' use of [bbolt](https://github.com/etcd-io/bbolt) and how that integrates with the file system.
+Unfortunately, I wasn't able to get Atlantis working with gcsfuse. I believe the reason why not is related to Atlantis' use of [bbolt](https://github.com/etcd-io/bbolt) and how that works with the file system.
 
-Periodically syncing the files to GCS was the compromise. It's conceivable that some state is missing or even corrupted in some way in GCS with this approach (e.g. if a container is `SIGKILL`ed halfway through an `rysnc`). If anything goes wrong, some manual intervention may be required to wipe the `/atlantis` directory in GCS. For developers using Atlantis, they may see their plans and locks disappear so would need to ask Atlantis to run those again.
+Periodically syncing the files to GCS was the compromise. It's conceivable that some state is missing or even corrupted in some way in GCS with this approach (e.g. if a container is `SIGKILL`ed halfway through an `rysnc`). If anything goes wrong, some manual intervention may be required to wipe the `/atlantis` directory in GCS. This is not a deal breaker though, for developers using Atlantis, they may see their plans and locks disappear so would need to ask Atlantis to run those again. 
+
+In my experience with other services, Cloud Run does not restart always allocated CPU instances very frequently, many days between restarts, so not having persistent state is a valid route to go down provided your team understands the consequences.
 
 #### Compute Engine
 
 With the locking and periodic GCS syncing workarounds, I am not entirely convinced running Atlantis on Cloud Run is a better solution than running it on Compute Engine. If we ask for 1 VM in Compute Engine, we will only ever have up to 1 VM running so no locking is necessary. Furthermore, attaching a data disk is sufficient for storing state across restarts. Fortunately, not all our investigations here are lost since the access control section would still apply by swapping the serverless backends for instance group ones that point to the Atlantis VM.
 
-Earlier, I mentioned the need for an "ugly startup script" when deploying the Atlantis container image and data disk. This is because the Atlantis account has to `chown` the mounted directory which I couldn't find a good way to do at the time. Now I've experimented with this Cloud Run approach, which includes some additions to the existing Atlantis Docker image, I can probably find a nicer way to do that `chown` and roll with the Compute Engine setup instead of Cloud Run .
+Earlier, I mentioned the need for an "ugly startup script" when deploying the Atlantis container image and data disk. This is because the Atlantis account has to `chown` the mounted directory which I couldn't find a good way to do at the time. Now I've experimented with this Cloud Run approach, which includes some additions to the existing Atlantis Docker image, I can probably find a nicer way to do that `chown` and roll with the Compute Engine setup instead of Cloud Run.
 
 ## Thanks for reading!
