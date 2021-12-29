@@ -265,7 +265,7 @@ The addition of the `gsutil rsync` command in `cleanup` pushes any final state c
 
 ## Summary
 
-We've seen how we can setup Atlantis in Cloud Run, taking care to configure the service to use always allocated CPU and introduce a locking mechanism to ensure only one instance is ever doing any work. We reasoned about why we'd need a load balancer and Cloud Armor and/or IAP to protect the endpoints. Finally, we look into how we can keep state across restarts by periodically backing the state up to GCS. The diagram below summarises this architecture:
+We've seen how we can setup Atlantis in Cloud Run, taking care to configure the service to use always allocated CPU and introduce a locking mechanism to ensure only one instance is ever doing any work. We reasoned about why we'd need a load balancer and Cloud Armor and/or IAP to protect the endpoints. Finally, we looked into how we can keep state across restarts by periodically backing the state up to GCS. The diagram below summarises this architecture:
 
 ![Atlantis on Cloud Run GCP architecture](../atlantis-on-cloudrun-gcp-architecture.png)
 
@@ -277,9 +277,9 @@ I recently stumbled onto [Using Cloud Storage FUSE with Cloud Run tutorial](http
 
 Unfortunately, I wasn't able to get Atlantis working with gcsfuse. I believe the reason why not is related to Atlantis' use of [bbolt](https://github.com/etcd-io/bbolt) and how that works with the file system.
 
-Periodically syncing the files to GCS was the compromise. It's conceivable that some state is missing or even corrupted in some way in GCS with this approach (e.g. if a container is `SIGKILL`ed halfway through an `rysnc`). If anything goes wrong, some manual intervention may be required to wipe the `/atlantis` directory in GCS. This is not a deal breaker though, for developers using Atlantis, they may see their plans and locks disappear so would need to ask Atlantis to run those again. 
+Periodically syncing the files to GCS was the compromise. It's conceivable that some state is missing or even corrupted in some way in GCS with this approach (e.g. if a container is `SIGKILL`ed halfway through an `rysnc`). If anything goes wrong, some manual intervention may be required to wipe the `/atlantis` directory in GCS. This is not a deal breaker though: for developers using Atlantis, they may see their plans and locks disappear so would need to ask Atlantis to run those again. 
 
-In my experience with other services, Cloud Run does not restart always allocated CPU instances very frequently, many days between restarts, so not having persistent state is a valid route to go down provided your team understands the consequences.
+In my experience with other services, Cloud Run does not restart always allocated CPU instances very frequently, with many days between restarts, so not having persistent state is a valid position to hold provided your team understands the consequences.
 
 #### Compute Engine
 
