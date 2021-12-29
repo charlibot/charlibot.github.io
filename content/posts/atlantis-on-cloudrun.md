@@ -76,9 +76,147 @@ At this point, we have a couple of options:
 1. Create a backend and associated [load balancer](https://cloud.google.com/load-balancing) with [Cloud Armor](https://cloud.google.com/armor) rules to limit the IP addresses that can access the service to Github and the workplace.
 1. Create two backends, one for `/events` which can be open (or apply the Cloud Armor rules from above) and another backend matching everything else to be protected by [Identity Aware Proxy](https://cloud.google.com/iap).
 
-In both cases we can use a custom domain and managed SSL certificate. Let's focus on the second approach and see what the Terraform code looks like:
+In both cases we can use a custom domain and managed SSL certificate. Let's focus on the second approach and see what the Terraform code for the load balancer module looks like:
 
-TODO: some terraform code
+```terraform
+module "atlantis-lb-https" {
+  # We use the serverless negs module from https://github.com/terraform-google-modules/terraform-google-lb-http/tree/master/modules/serverless_negs
+  source  = "GoogleCloudPlatform/lb-http/google//modules/serverless_negs"
+  version = "~> 5.1"
+  name    = "atlantis"
+  project = var.project_id
+
+  # Enable SSL support with a managed certificate and HTTPS redirect
+  ssl                             = true
+  managed_ssl_certificate_domains = [var.domain]
+  https_redirect                  = true
+
+  url_map        = google_compute_url_map.atlantis_url_map.self_link
+  create_url_map = false
+
+  backends = {
+    # Default backend for the UI with IAP enabled
+    default = {
+      description = null
+      groups = [
+        {
+          group = google_compute_region_network_endpoint_group.serverless_neg.id
+        }
+      ]
+      enable_cdn              = false
+      security_policy         = null
+      custom_request_headers  = null
+      custom_response_headers = null
+
+      iap_config = {
+        enable               = true
+        oauth2_client_id     = var.oauth2_client_id
+        oauth2_client_secret = var.oauth2_client_secret
+      }
+      log_config = {
+        enable      = false
+        sample_rate = null
+      }
+    }
+
+    # Backend for /events with IAP disabled but with github_only_policy
+    events = {
+      description = "Backend for Atlantis' /events endpoint"
+      groups = [
+        {
+          group = google_compute_region_network_endpoint_group.serverless_neg.id
+        }
+      ]
+      enable_cdn              = false
+      security_policy         = google_compute_security_policy.github_only_policy.name
+      custom_request_headers  = null
+      custom_response_headers = null
+
+      iap_config = {
+        enable               = false
+        oauth2_client_id     = ""
+        oauth2_client_secret = ""
+      }
+      log_config = {
+        enable      = false
+        sample_rate = null
+      }
+    }
+  }
+}
+```
+
+The Terraform code above refers to some resources that are defined below. These may need some tweaking for your own setup but the general idea is there.
+
+```terraform
+resource "google_compute_region_network_endpoint_group" "atlantis_serverless_neg" {
+  provider              = google-beta
+  name                  = "atlantis-serverless-neg"
+  network_endpoint_type = "SERVERLESS"
+  region                = var.region
+  cloud_run {
+    # The name of the Cloud Run service. This can also be defined in Terraform and referred to here
+    service = "atlantis"
+  }
+}
+
+resource "google_compute_security_policy" "github_only_policy" {
+  name = "github-only-policy"
+
+  rule {
+    action   = "allow"
+    priority = "1000"
+    match {
+      versioned_expr = "SRC_IPS_V1"
+      config {
+        src_ip_ranges = [
+          "192.30.252.0/22",
+          "185.199.108.0/22",
+          "140.82.112.0/20",
+          "143.55.64.0/20",
+          "2a0a:a440::/29",
+          "2606:50c0::/32",
+        ]
+      }
+    }
+    description = "Allow access from Github's webhook IPs found at https://api.github.com/meta"
+  }
+
+  rule {
+    action   = "deny(403)"
+    priority = "2147483647"
+    match {
+      versioned_expr = "SRC_IPS_V1"
+      config {
+        src_ip_ranges = ["*"]
+      }
+    }
+    description = "Deny access to all IPs"
+  }
+}
+
+resource "google_compute_url_map" "atlantis_url_map" {
+  name            = "atlantis"
+  default_service = module.atlantis-lb-https.backend_services["default"].self_link
+
+  host_rule {
+    hosts        = [var.domain]
+    path_matcher = "allpaths"
+  }
+
+  path_matcher {
+    name            = "allpaths"
+    default_service = module.atlantis-lb-https.backend_services["default"].self_link
+
+    path_rule {
+      paths = [
+        "/events"
+      ]
+      service = module.atlantis-lb-https.backend_services["events"].self_link
+    }
+  }
+}
+```
 
 Finally, we should restrict the Cloud Run service's [ingress](https://cloud.google.com/run/docs/securing/ingress) to "Internal and Cloud Load Balancing". Then, the default domain cannot be used to bypass the protections added above.
 
@@ -111,10 +249,15 @@ gsutil rsync -d -r gs://$ATLANTIS_BUCKET/atlantis/ $ATLANTIS_DATA_DIR
 chown -R atlantis:atlantis $ATLANTIS_DATA_DIR
 
 # start server...
+export ATLANTIS_PORT=$PORT
+gosu atlantis atlantis server &
 
 # Sync the files back to GCS every minute
 crontab -l | { cat; echo "* * * * * gsutil rsync -d -r $ATLANTIS_DATA_DIR gs://$ATLANTIS_BUCKET/atlantis/"; } | crontab -
 crond
+
+# Exit immediately when one of the background processes terminate.
+wait -n
 ```
 
 The addition of the `gsutil rsync` command in `cleanup` pushes any final state changes to GCS before finishing.
