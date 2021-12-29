@@ -1,11 +1,11 @@
 ---
 title: "Atlantis on Cloud Run"
 date: 2021-12-26T22:45:12+01:00
-draft: true
+draft: false
 tags: [
     "gcp",
     "terraform",
-    "atlantis",
+    "cloudrun",
     "devops",
 ]
 ---
