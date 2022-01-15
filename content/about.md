@@ -4,6 +4,4 @@ type: section
 title: "About"
 ---
 
-Written in DNA and compiled to human, charlibot is capable of simple thoughts and attempts at programming.
-
-
+Hi! I'm Charlie, a software engineer, and these are some posts on various programming related topics.
